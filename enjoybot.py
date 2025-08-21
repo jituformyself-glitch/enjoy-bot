@@ -24,9 +24,6 @@ logging.basicConfig(
 # ---------------- FLASK APP ----------------
 app = Flask(__name__)
 
-# ---------------- TELEGRAM BOT ----------------
-application = Application.builder().token(TOKEN).build()  # async-only
-
 # ---------------- HELPER FUNCTIONS ----------------
 def load_data():
     if os.path.exists(DATA_FILE):
@@ -72,10 +69,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("Aap already register ho chuke ho. Group link: " + GROUP_LINK)
 
-# ---------------- ADD HANDLERS ----------------
-application.add_handler(CommandHandler("start", start))
-application.add_handler(MessageHandler(filters.ALL, handle_message))
-
 # ---------------- FLASK ROUTES ----------------
 @app.route(f"/{TOKEN}", methods=["POST"])
 async def webhook():
@@ -96,9 +89,18 @@ if __name__ == "__main__":
     nest_asyncio.apply()
 
     async def main():
-        # Webhook setup
+        global application
+        # PTB Application create inside async function to avoid Updater errors
+        application = Application.builder().token(TOKEN).build()
+
+        # Add handlers
+        application.add_handler(CommandHandler("start", start))
+        application.add_handler(MessageHandler(filters.ALL, handle_message))
+
+        # Set webhook
         await application.bot.set_webhook(f"{URL}/{TOKEN}")
 
+        # Hypercorn config
         config = Config()
         config.bind = [f"0.0.0.0:{PORT}"]
         await serve(app, config)
