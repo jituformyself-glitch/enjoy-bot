@@ -13,7 +13,9 @@ GROUP_LINK = "https://t.me/campvoyzmoney"
 DATA_FILE = "user_data.json"
 ADMIN_ID = "6364785460"
 PORT = int(os.environ.get("PORT", 5000))
-URL = os.getenv("RENDER_EXTERNAL_URL", "https://enjoy-bot2.onrender.com")  # <- yaha render ka domain aayega
+
+# Agar env variable set hai to use karega, warna render ka domain use karega
+URL = os.getenv("RENDER_EXTERNAL_URL", "https://enjoy-bot.onrender.com")
 
 # -------------------- LOGGING --------------------
 logging.basicConfig(
