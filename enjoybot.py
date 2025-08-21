@@ -1,26 +1,31 @@
+from flask import Flask, request
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
+from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
+import logging
 import json
-import os
 from datetime import datetime, timedelta
-from telegram import Update
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    MessageHandler,
-    ConversationHandler,
-    ContextTypes,
-    filters,
+import os
+
+# -------------------- CONFIG --------------------
+TOKEN = "8082388693:AAH4j1DMEUbEiBCp6IPspxwVYI9HNQFEadw"
+GROUP_LINK = "https://t.me/joinchat/YourGroupLinkHere"
+DATA_FILE = "user_data.json"
+ADMIN_ID = "YOUR_TELEGRAM_ID"  # sirf aap check karne ke liye
+PORT = int(os.environ.get("PORT", 5000))
+
+# -------------------- LOGGING --------------------
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
 )
 
-# ==== CONFIG ====
-TOKEN = "8082388693:AAH4j1DMEUbEiBCp6IPspxwVYI9HNQFEadw"
-ADMIN_ID = 6364785460
-GROUP_LINK = "https://t.me/campvoyzmoney"
-DATA_FILE = "users_data.json"
+# -------------------- FLASK APP --------------------
+app = Flask(__name__)
 
-# ==== States ====
-ASK_NAME, ASK_PHONE = range(2)
+# -------------------- TELEGRAM BOT --------------------
+application = ApplicationBuilder().token(TOKEN).build()
 
-# ==== Data Handling ====
+# -------------------- HELPER FUNCTIONS --------------------
 def load_data():
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, "r") as f:
@@ -29,84 +34,60 @@ def load_data():
 
 def save_data(data):
     with open(DATA_FILE, "w") as f:
-        json.dump(data, f, indent=4)
+        json.dump(data, f)
 
-users_data = load_data()
-user_count = len(users_data)
+def clean_old_data():
+    data = load_data()
+    now = datetime.now()
+    data = {k:v for k,v in data.items() if datetime.fromisoformat(v['timestamp']) + timedelta(days=30) > now}
+    save_data(data)
 
-# ==== Handlers ====
+# -------------------- BOT HANDLERS --------------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.message.from_user
     await update.message.reply_text(
-        f"Hello {update.effective_user.first_name}! 👋\n"
-        "Agar aapko 'Money Offering Group' join karna hai toh pehle apna **Name** aur **Phone Number** register karna hoga.\n"
-        "Don't worry, ye 100% secure hai ✅\n\n"
-        "👉 Pehle apna *Name* bhejo."
-    )
-    return ASK_NAME
-
-async def ask_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data["name"] = update.message.text
-    await update.message.reply_text("Great 👍 Ab apna *Phone Number* bhejo:")
-    return ASK_PHONE
-
-async def ask_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global user_count
-    phone = update.message.text
-    name = context.user_data.get("name")
-
-    user_count += 1
-    join_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    users_data[user_count] = {
-        "name": name,
-        "phone no.": phone,
-        "joined_at": join_time
-    }
-
-    save_data(users_data)
-
-    await update.message.reply_text(
-        f"Thanks {name} ✅\nAap ab group join kar sakte ho 👇\n{GROUP_LINK}"
-    )
-    return ConversationHandler.END
-
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Registration cancel kar diya gaya ❌")
-    return ConversationHandler.END
-
-# ==== Admin Only: Show Users ====
-async def show_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
-        await update.message.reply_text("⛔ Aap authorized nahi ho is command ke liye.")
-        return
-
-    if not users_data:
-        await update.message.reply_text("⚠️ Abhi tak koi user join nahi hua.")
-        return
-
-    msg = "📋 Registered Users:\n\n"
-    for num, data in users_data.items():
-        msg += f"{num}. Name: {data['name']} | Phone: {data['phone no.']} | Joined: {data['joined_at']}\n"
-
-    await update.message.reply_text(msg)
-
-# ==== MAIN ====
-def main():
-    app = ApplicationBuilder().token(TOKEN).build()
-
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("start", start)],
-        states={
-            ASK_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_name)],
-            ASK_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, ask_phone)],
-        },
-        fallbacks=[CommandHandler("cancel", cancel)],
+        f"Hello {user.first_name}! Agar aapko money offering group join karna hai, toh pehle apna full name bheje."
     )
 
-    app.add_handler(conv_handler)
-    app.add_handler(CommandHandler("users", show_users))
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.message.from_user.id)
+    text = update.message.text
+    data = load_data()
+    clean_old_data()
+    
+    if user_id not in data:
+        # Save name
+        data[user_id] = {"name": text, "timestamp": datetime.now().isoformat()}
+        save_data(data)
+        
+        # Ask phone
+        keyboard = [[KeyboardButton("Share Phone Number", request_contact=True)]]
+        reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
+        await update.message.reply_text("Ab apna phone number share kare.", reply_markup=reply_markup)
+    elif 'phone' not in data[user_id] and update.message.contact:
+        # Save phone
+        data[user_id]['phone'] = update.message.contact.phone_number
+        save_data(data)
+        
+        # Send group link
+        await update.message.reply_text(f"Shukriya! Yaha aapka group link hai:\n{GROUP_LINK}")
+    else:
+        await update.message.reply_text("Already registered. Group link: " + GROUP_LINK)
 
-    app.run_polling()
+# -------------------- WEBHOOK --------------------
+@app.route(f"/{TOKEN}", methods=["POST"])
+def webhook():
+    update = Update.de_json(request.get_json(force=True), application.bot)
+    application.create_task(application.process_update(update))
+    return "ok"
 
+@app.route("/")
+def index():
+    return "Bot is running!"
+
+# -------------------- MAIN --------------------
 if __name__ == "__main__":
-    main()
+    from telegram import __version__ as TG_VER
+    print("Telegram Bot API Version:", TG_VER)
+    application.run_polling()  # sirf local testing ke liye
+    app.run(host="0.0.0.0", port=PORT)
