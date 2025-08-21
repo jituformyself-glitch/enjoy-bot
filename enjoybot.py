@@ -1,11 +1,12 @@
 from flask import Flask, request
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 import logging
 import json
 from datetime import datetime, timedelta
 import os
 import asyncio
+import nest_asyncio
 
 # ---------------- CONFIG ----------------
 TOKEN = os.getenv("BOT_TOKEN", "8082388693:AAH4j1DMEUbEiBCp6IPspxwVYI9HNQFEadw")
@@ -24,7 +25,7 @@ logging.basicConfig(
 app = Flask(__name__)
 
 # ---------------- TELEGRAM BOT ----------------
-application = ApplicationBuilder().token(TOKEN).build()  # Async only, no Updater
+application = Application.builder().token(TOKEN).build()  # Async only, no Updater
 
 # ---------------- HELPER FUNCTIONS ----------------
 def load_data():
@@ -93,11 +94,12 @@ if __name__ == "__main__":
         webhook_url = f"{URL}/{TOKEN}"
         logging.info(f"Setting webhook to {webhook_url}")
         await application.bot.set_webhook(webhook_url)
+
         # Flask ko asyncio ke loop me run karna
-        import nest_asyncio
         nest_asyncio.apply()
         from hypercorn.asyncio import serve
         from hypercorn.config import Config
+
         config = Config()
         config.bind = [f"0.0.0.0:{PORT}"]
         await serve(app, config)
