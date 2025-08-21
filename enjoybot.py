@@ -1,6 +1,6 @@
 from flask import Flask, request
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 import logging
 import json
 from datetime import datetime, timedelta
@@ -25,7 +25,7 @@ logging.basicConfig(
 app = Flask(__name__)
 
 # ---------------- TELEGRAM BOT ----------------
-application = Application.builder().token(TOKEN).build()  # Async only, no Updater
+application = ApplicationBuilder().token(TOKEN).build()  # Async only, no Updater
 
 # ---------------- HELPER FUNCTIONS ----------------
 def load_data():
