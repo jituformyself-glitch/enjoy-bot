@@ -1,10 +1,11 @@
 from flask import Flask, request
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, Bot
-from telegram.ext import Dispatcher, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 import logging
 import json
 from datetime import datetime, timedelta
 import os
+import asyncio
 
 # ---------------- CONFIG ----------------
 TOKEN = os.getenv("BOT_TOKEN", "8082388693:AAH4j1DMEUbEiBCp6IPspxwVYI9HNQFEadw")
@@ -14,14 +15,16 @@ PORT = int(os.environ.get("PORT", 5000))
 URL = os.getenv("RENDER_EXTERNAL_URL", "https://enjoy-bot.onrender.com")
 
 # ---------------- LOGGING ----------------
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
 
 # ---------------- FLASK APP ----------------
 app = Flask(__name__)
 
 # ---------------- TELEGRAM BOT ----------------
-bot = Bot(token=TOKEN)
-dispatcher = Dispatcher(bot, update_queue=None, use_context=True)
+application = ApplicationBuilder().token(TOKEN).build()  # Webhook only, polling disabled
 
 # ---------------- HELPER FUNCTIONS ----------------
 def load_data():
@@ -68,15 +71,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("Aap already register ho chuke ho. Group link: " + GROUP_LINK)
 
-# ---------------- DISPATCHER ----------------
-dispatcher.add_handler(CommandHandler("start", start))
-dispatcher.add_handler(MessageHandler(filters.ALL, handle_message))
+# ---------------- ADD HANDLERS ----------------
+application.add_handler(CommandHandler("start", start))
+application.add_handler(MessageHandler(filters.ALL, handle_message))
 
 # ---------------- FLASK ROUTES ----------------
 @app.route(f"/{TOKEN}", methods=["POST"])
-def webhook():
-    update = Update.de_json(request.get_json(force=True), bot)
-    dispatcher.process_update(update)
+async def webhook():
+    update = Update.de_json(request.get_json(force=True), application.bot)
+    await application.process_update(update)
     return "ok"
 
 @app.route("/")
@@ -85,6 +88,10 @@ def index():
 
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
-    logging.info(f"Setting webhook to {URL}/{TOKEN}")
-    bot.set_webhook(f"{URL}/{TOKEN}")
-    app.run(host="0.0.0.0", port=PORT)
+    async def run():
+        webhook_url = f"{URL}/{TOKEN}"
+        logging.info(f"Setting webhook to {webhook_url}")
+        await application.bot.set_webhook(webhook_url)
+        app.run(host="0.0.0.0", port=PORT)
+
+    asyncio.run(run())
