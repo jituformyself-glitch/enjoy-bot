@@ -1,6 +1,6 @@
 from flask import Flask, request
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 import logging
 import json
 from datetime import datetime, timedelta
@@ -9,7 +9,7 @@ import asyncio
 import nest_asyncio
 
 # ---------------- CONFIG ----------------
-TOKEN = os.getenv("BOT_TOKEN", "8082388693:AAH4j1DMEUbEiBCp6IPspxwVYI9HNQFEadw")
+TOKEN = os.getenv("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
 GROUP_LINK = "https://t.me/campvoyzmoney"
 DATA_FILE = "user_data.json"
 PORT = int(os.environ.get("PORT", 5000))
@@ -25,7 +25,8 @@ logging.basicConfig(
 app = Flask(__name__)
 
 # ---------------- TELEGRAM BOT ----------------
-application = Application.builder().token(TOKEN).build()  # PTB 20.5 async-only
+# PTB 20.5 async-only, no Updater
+application = ApplicationBuilder().token(TOKEN).build()
 
 # ---------------- HELPER FUNCTIONS ----------------
 def load_data():
@@ -91,11 +92,11 @@ def index():
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
     async def main():
+        nest_asyncio.apply()
         webhook_url = f"{URL}/{TOKEN}"
         logging.info(f"Setting webhook to {webhook_url}")
         await application.bot.set_webhook(webhook_url)
 
-        nest_asyncio.apply()
         from hypercorn.asyncio import serve
         from hypercorn.config import Config
 
