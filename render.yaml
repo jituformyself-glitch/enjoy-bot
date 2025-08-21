@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: enjoy-bot2
+    env: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn enjoybot:app"
+    envVars:
+      - key: PORT
+        value: "10000"
