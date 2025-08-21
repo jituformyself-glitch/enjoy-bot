@@ -6,6 +6,7 @@ import json
 from datetime import datetime, timedelta
 import os
 import asyncio
+import uvicorn
 
 # ---------------- CONFIG ----------------
 TOKEN = os.getenv("BOT_TOKEN", "8082388693:AAH4j1DMEUbEiBCp6IPspxwVYI9HNQFEadw")
@@ -88,10 +89,11 @@ def index():
 
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
-    async def run():
+    async def main():
         webhook_url = f"{URL}/{TOKEN}"
         logging.info(f"Setting webhook to {webhook_url}")
         await application.bot.set_webhook(webhook_url)
-        app.run(host="0.0.0.0", port=PORT)
+        # Use uvicorn to run Flask async app
+        uvicorn.run(app, host="0.0.0.0", port=PORT)
 
-    asyncio.run(run())
+    asyncio.run(main())
