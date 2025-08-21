@@ -6,7 +6,6 @@ import json
 from datetime import datetime, timedelta
 import os
 import asyncio
-import uvicorn
 
 # ---------------- CONFIG ----------------
 TOKEN = os.getenv("BOT_TOKEN", "8082388693:AAH4j1DMEUbEiBCp6IPspxwVYI9HNQFEadw")
@@ -25,7 +24,7 @@ logging.basicConfig(
 app = Flask(__name__)
 
 # ---------------- TELEGRAM BOT ----------------
-application = ApplicationBuilder().token(TOKEN).build()  # Webhook only, polling disabled
+application = ApplicationBuilder().token(TOKEN).build()  # Async only, no Updater
 
 # ---------------- HELPER FUNCTIONS ----------------
 def load_data():
@@ -79,7 +78,8 @@ application.add_handler(MessageHandler(filters.ALL, handle_message))
 # ---------------- FLASK ROUTES ----------------
 @app.route(f"/{TOKEN}", methods=["POST"])
 async def webhook():
-    update = Update.de_json(request.get_json(force=True), application.bot)
+    data = request.get_json(force=True)
+    update = Update.de_json(data, application.bot)
     await application.process_update(update)
     return "ok"
 
@@ -93,7 +93,13 @@ if __name__ == "__main__":
         webhook_url = f"{URL}/{TOKEN}"
         logging.info(f"Setting webhook to {webhook_url}")
         await application.bot.set_webhook(webhook_url)
-        # Use uvicorn to run Flask async app
-        uvicorn.run(app, host="0.0.0.0", port=PORT)
+        # Flask ko asyncio ke loop me run karna
+        import nest_asyncio
+        nest_asyncio.apply()
+        from hypercorn.asyncio import serve
+        from hypercorn.config import Config
+        config = Config()
+        config.bind = [f"0.0.0.0:{PORT}"]
+        await serve(app, config)
 
     asyncio.run(main())
