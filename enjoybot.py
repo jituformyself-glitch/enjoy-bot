@@ -1,6 +1,6 @@
 from flask import Flask, request
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 import logging
 import json
 from datetime import datetime, timedelta
@@ -25,7 +25,7 @@ logging.basicConfig(
 app = Flask(__name__)
 
 # ---------------- TELEGRAM BOT ----------------
-application = ApplicationBuilder().token(TOKEN).build()  # Async only, no Updater
+application = Application.builder().token(TOKEN).build()  # PTB 20.5 async-only
 
 # ---------------- HELPER FUNCTIONS ----------------
 def load_data():
@@ -95,7 +95,6 @@ if __name__ == "__main__":
         logging.info(f"Setting webhook to {webhook_url}")
         await application.bot.set_webhook(webhook_url)
 
-        # Flask ko asyncio ke loop me run karna
         nest_asyncio.apply()
         from hypercorn.asyncio import serve
         from hypercorn.config import Config
