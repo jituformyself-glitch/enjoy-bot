@@ -9,7 +9,7 @@ import asyncio
 import nest_asyncio
 
 # ---------------- CONFIG ----------------
-TOKEN = os.getenv("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
+TOKEN = os.getenv("BOT_TOKEN", "8082388693:AAH4j1DMEUbEiBCp6IPspxwVYI9HNQFEadw")
 GROUP_LINK = "https://t.me/campvoyzmoney"
 DATA_FILE = "user_data.json"
 PORT = int(os.environ.get("PORT", 5000))
@@ -25,8 +25,7 @@ logging.basicConfig(
 app = Flask(__name__)
 
 # ---------------- TELEGRAM BOT ----------------
-# PTB 20.5 async-only, no Updater
-application = ApplicationBuilder().token(TOKEN).build()
+application = ApplicationBuilder().token(TOKEN).build()  # Async-only
 
 # ---------------- HELPER FUNCTIONS ----------------
 def load_data():
@@ -92,11 +91,12 @@ def index():
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
     async def main():
-        nest_asyncio.apply()
         webhook_url = f"{URL}/{TOKEN}"
         logging.info(f"Setting webhook to {webhook_url}")
         await application.bot.set_webhook(webhook_url)
 
+        # Flask ko asyncio loop me run karna
+        nest_asyncio.apply()
         from hypercorn.asyncio import serve
         from hypercorn.config import Config
 
