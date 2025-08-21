@@ -1,19 +1,17 @@
 from flask import Flask, request
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, Bot
+from telegram.ext import Dispatcher, CommandHandler, MessageHandler, filters, ContextTypes
 import logging
 import json
 from datetime import datetime, timedelta
 import os
-import asyncio
 
 # ---------------- CONFIG ----------------
 TOKEN = os.getenv("BOT_TOKEN", "8082388693:AAH4j1DMEUbEiBCp6IPspxwVYI9HNQFEadw")
 GROUP_LINK = "https://t.me/campvoyzmoney"
 DATA_FILE = "user_data.json"
-ADMIN_ID = "6364785460"
 PORT = int(os.environ.get("PORT", 5000))
-URL = os.getenv("RENDER_EXTERNAL_URL", "https://enjoy-bot.onrender.com")  # Env variable fallback
+URL = os.getenv("RENDER_EXTERNAL_URL", "https://enjoy-bot.onrender.com")
 
 # ---------------- LOGGING ----------------
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -22,7 +20,8 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 app = Flask(__name__)
 
 # ---------------- TELEGRAM BOT ----------------
-application = ApplicationBuilder().token(TOKEN).build()  # Webhook only, polling disabled
+bot = Bot(token=TOKEN)
+dispatcher = Dispatcher(bot, update_queue=None, use_context=True)
 
 # ---------------- HELPER FUNCTIONS ----------------
 def load_data():
@@ -54,26 +53,30 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = load_data()
     clean_old_data()
 
-    if user_id not in data:  # Name step
+    if user_id not in data:
         data[user_id] = {"name": text, "timestamp": datetime.now().isoformat()}
         save_data(data)
         keyboard = [[KeyboardButton("📱 Share Phone Number", request_contact=True)]]
         reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
         await update.message.reply_text("Ab apna phone number share kare.", reply_markup=reply_markup)
 
-    elif 'phone' not in data[user_id] and update.message.contact:  # Phone step
+    elif 'phone' not in data[user_id] and update.message.contact:
         data[user_id]['phone'] = update.message.contact.phone_number
         save_data(data)
         await update.message.reply_text(f"✅ Shukriya! Ye rahi group ki link:\n{GROUP_LINK}")
 
-    else:  # Already registered
+    else:
         await update.message.reply_text("Aap already register ho chuke ho. Group link: " + GROUP_LINK)
+
+# ---------------- DISPATCHER ----------------
+dispatcher.add_handler(CommandHandler("start", start))
+dispatcher.add_handler(MessageHandler(filters.ALL, handle_message))
 
 # ---------------- FLASK ROUTES ----------------
 @app.route(f"/{TOKEN}", methods=["POST"])
-async def webhook():
-    update = Update.de_json(request.get_json(force=True), application.bot)
-    await application.process_update(update)
+def webhook():
+    update = Update.de_json(request.get_json(force=True), bot)
+    dispatcher.process_update(update)
     return "ok"
 
 @app.route("/")
@@ -82,15 +85,6 @@ def index():
 
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
-    # Add handlers
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(filters.ALL, handle_message))
-
-    # Webhook setup + Flask run
-    async def run():
-        webhook_url = f"{URL}/{TOKEN}"
-        logging.info(f"Setting webhook to {webhook_url}")
-        await application.bot.set_webhook(webhook_url)
-        app.run(host="0.0.0.0", port=PORT)
-
-    asyncio.run(run())
+    logging.info(f"Setting webhook to {URL}/{TOKEN}")
+    bot.set_webhook(f"{URL}/{TOKEN}")
+    app.run(host="0.0.0.0", port=PORT)
