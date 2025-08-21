@@ -71,10 +71,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ---------------- FLASK ROUTES ----------------
 @app.route(f"/{TOKEN}", methods=["POST"])
-async def webhook():
+def webhook():
+    """Sync webhook to avoid async conflicts"""
     data = request.get_json(force=True)
     update = Update.de_json(data, application.bot)
-    await application.process_update(update)
+    # Run async bot processing in event loop
+    asyncio.run(application.process_update(update))
     return "ok"
 
 @app.route("/")
@@ -90,7 +92,7 @@ if __name__ == "__main__":
 
     async def main():
         global application
-        # PTB Application create inside async function to avoid Updater errors
+        # PTB Application create inside async function
         application = Application.builder().token(TOKEN).build()
 
         # Add handlers
