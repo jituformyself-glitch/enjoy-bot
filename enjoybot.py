@@ -97,9 +97,8 @@ if __name__ == "__main__":
     nest_asyncio.apply()
 
     async def main():
-        webhook_url = f"{URL}/{TOKEN}"
-        logging.info(f"Setting webhook to {webhook_url}")
-        await application.bot.set_webhook(webhook_url)
+        # Correct async webhook setup
+        await application.bot.set_webhook(f"{URL}/{TOKEN}")
 
         config = Config()
         config.bind = [f"0.0.0.0:{PORT}"]
