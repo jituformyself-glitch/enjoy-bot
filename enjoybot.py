@@ -71,12 +71,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ---------------- FLASK ROUTES ----------------
 @app.route(f"/{TOKEN}", methods=["POST"])
-def webhook():
-    """Sync webhook to avoid async conflicts"""
-    data = request.get_json(force=True)
+async def webhook():
+    data = await request.get_json(force=True)
     update = Update.de_json(data, application.bot)
-    # Run async bot processing in event loop
-    asyncio.run(application.process_update(update))
+    await application.process_update(update)
     return "ok"
 
 @app.route("/")
