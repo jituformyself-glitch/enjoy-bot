@@ -5,6 +5,7 @@ import logging
 import json
 from datetime import datetime, timedelta
 import os
+import asyncio
 
 # -------------------- CONFIG --------------------
 TOKEN = "8082388693:AAH4j1DMEUbEiBCp6IPspxwVYI9HNQFEadw"
@@ -39,7 +40,7 @@ def save_data(data):
 def clean_old_data():
     data = load_data()
     now = datetime.now()
-    data = {k:v for k,v in data.items() if datetime.fromisoformat(v['timestamp']) + timedelta(days=30) > now}
+    data = {k: v for k, v in data.items() if datetime.fromisoformat(v['timestamp']) + timedelta(days=30) > now}
     save_data(data)
 
 # -------------------- BOT HANDLERS --------------------
@@ -51,43 +52,46 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.message.from_user.id)
-    text = update.message.text
     data = load_data()
     clean_old_data()
-    
-    if user_id not in data:
+
+    if user_id not in data and update.message.text:
         # Save name
-        data[user_id] = {"name": text, "timestamp": datetime.now().isoformat()}
+        data[user_id] = {"name": update.message.text, "timestamp": datetime.now().isoformat()}
         save_data(data)
-        
+
         # Ask phone
         keyboard = [[KeyboardButton("Share Phone Number", request_contact=True)]]
         reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
         await update.message.reply_text("Ab apna phone number share kare.", reply_markup=reply_markup)
-    elif 'phone' not in data[user_id] and update.message.contact:
+
+    elif user_id in data and 'phone' not in data[user_id] and update.message.contact:
         # Save phone
         data[user_id]['phone'] = update.message.contact.phone_number
         save_data(data)
-        
+
         # Send group link
         await update.message.reply_text(f"Shukriya! Yaha aapka group link hai:\n{GROUP_LINK}")
+
     else:
         await update.message.reply_text("Already registered. Group link: " + GROUP_LINK)
+
+# -------------------- REGISTER HANDLERS --------------------
+application.add_handler(CommandHandler("start", start))
+application.add_handler(MessageHandler(filters.TEXT | filters.CONTACT, handle_message))
 
 # -------------------- WEBHOOK --------------------
 @app.route(f"/{TOKEN}", methods=["POST"])
 def webhook():
     update = Update.de_json(request.get_json(force=True), application.bot)
-    application.create_task(application.process_update(update))
+    asyncio.create_task(application.process_update(update))
     return "ok"
 
-@app.route("/")
+@app.route("/", methods=["GET"])
 def index():
     return "Bot is running!"
 
 # -------------------- MAIN --------------------
 if __name__ == "__main__":
-    from telegram import __version__ as TG_VER
-    print("Telegram Bot API Version:", TG_VER)
-    application.run_polling()  # sirf local testing ke liye
+    print("Starting bot with Flask + Webhook...")
     app.run(host="0.0.0.0", port=PORT)
