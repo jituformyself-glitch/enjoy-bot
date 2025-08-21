@@ -25,7 +25,7 @@ logging.basicConfig(
 app = Flask(__name__)
 
 # ---------------- TELEGRAM BOT ----------------
-application = Application.builder().token(TOKEN).build()  # Async-only
+application = Application.builder().token(TOKEN).build()  # async-only
 
 # ---------------- HELPER FUNCTIONS ----------------
 def load_data():
@@ -90,14 +90,13 @@ def index():
 
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
-    import nest_asyncio
     from hypercorn.asyncio import serve
     from hypercorn.config import Config
 
     nest_asyncio.apply()
 
     async def main():
-        # Correct async webhook setup
+        # Webhook setup
         await application.bot.set_webhook(f"{URL}/{TOKEN}")
 
         config = Config()
