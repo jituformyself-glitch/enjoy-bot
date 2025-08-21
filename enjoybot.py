@@ -1,35 +1,30 @@
 from flask import Flask, request
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import Application, ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 import logging
 import json
 from datetime import datetime, timedelta
 import os
 import asyncio
 
-# -------------------- CONFIG --------------------
-TOKEN = "8082388693:AAH4j1DMEUbEiBCp6IPspxwVYI9HNQFEadw"
+# ---------------- CONFIG ----------------
+TOKEN = os.getenv("BOT_TOKEN", "8082388693:AAH4j1DMEUbEiBCp6IPspxwVYI9HNQFEadw")
 GROUP_LINK = "https://t.me/campvoyzmoney"
 DATA_FILE = "user_data.json"
 ADMIN_ID = "6364785460"
 PORT = int(os.environ.get("PORT", 5000))
+URL = os.getenv("RENDER_EXTERNAL_URL", "https://enjoy-bot.onrender.com")  # Env variable fallback
 
-# Agar env variable set hai to use karega, warna render ka domain use karega
-URL = os.getenv("RENDER_EXTERNAL_URL", "https://enjoy-bot.onrender.com")
+# ---------------- LOGGING ----------------
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-# -------------------- LOGGING --------------------
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-
-# -------------------- FLASK APP --------------------
+# ---------------- FLASK APP ----------------
 app = Flask(__name__)
 
-# -------------------- TELEGRAM BOT --------------------
-application = ApplicationBuilder().token(TOKEN).build()
+# ---------------- TELEGRAM BOT ----------------
+application = ApplicationBuilder().token(TOKEN).build()  # Webhook only, polling disabled
 
-# -------------------- HELPER FUNCTIONS --------------------
+# ---------------- HELPER FUNCTIONS ----------------
 def load_data():
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, "r") as f:
@@ -46,7 +41,7 @@ def clean_old_data():
     data = {k:v for k,v in data.items() if datetime.fromisoformat(v['timestamp']) + timedelta(days=30) > now}
     save_data(data)
 
-# -------------------- BOT HANDLERS --------------------
+# ---------------- BOT HANDLERS ----------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
     await update.message.reply_text(
@@ -59,22 +54,22 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = load_data()
     clean_old_data()
 
-    if user_id not in data:  # name lene ka step
+    if user_id not in data:  # Name step
         data[user_id] = {"name": text, "timestamp": datetime.now().isoformat()}
         save_data(data)
         keyboard = [[KeyboardButton("📱 Share Phone Number", request_contact=True)]]
         reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
         await update.message.reply_text("Ab apna phone number share kare.", reply_markup=reply_markup)
 
-    elif 'phone' not in data[user_id] and update.message.contact:  # phone lene ka step
+    elif 'phone' not in data[user_id] and update.message.contact:  # Phone step
         data[user_id]['phone'] = update.message.contact.phone_number
         save_data(data)
         await update.message.reply_text(f"✅ Shukriya! Ye rahi group ki link:\n{GROUP_LINK}")
 
-    else:  # agar user dobara msg kare
+    else:  # Already registered
         await update.message.reply_text("Aap already register ho chuke ho. Group link: " + GROUP_LINK)
 
-# -------------------- ROUTES --------------------
+# ---------------- FLASK ROUTES ----------------
 @app.route(f"/{TOKEN}", methods=["POST"])
 async def webhook():
     update = Update.de_json(request.get_json(force=True), application.bot)
@@ -85,12 +80,13 @@ async def webhook():
 def index():
     return "Bot is running!"
 
-# -------------------- MAIN --------------------
+# ---------------- MAIN ----------------
 if __name__ == "__main__":
+    # Add handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.ALL, handle_message))
 
-    # Render webhook setup
+    # Webhook setup + Flask run
     async def run():
         webhook_url = f"{URL}/{TOKEN}"
         logging.info(f"Setting webhook to {webhook_url}")
