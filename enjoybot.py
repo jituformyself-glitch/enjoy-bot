@@ -1,4 +1,4 @@
-from flask import Flask, request  
+from flask import Flask, request
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 import logging
@@ -29,6 +29,7 @@ app = Flask(__name__)
 
 # ---------------- GLOBAL APP ----------------
 application = None   # init main() ke andar hoga
+loop = asyncio.get_event_loop()
 
 # ---------------- HELPER FUNCTIONS ----------------
 def load_data():
@@ -92,10 +93,10 @@ def webhook():
     data = request.get_json(force=True)
     update = Update.de_json(data, application.bot)
 
-    # PTB queue me safe async push
-    asyncio.create_task(application.update_queue.put(update))
+    # Correct way → Flask se PTB queue me safe push
+    loop.create_task(application.update_queue.put(update))
 
-    return "ok"
+    return "ok", 200
 
 @app.route("/")
 def index():
@@ -128,4 +129,4 @@ if __name__ == "__main__":
             serve(app, config),
         )
 
-    asyncio.run(main())
+    loop.run_until_complete(main())
