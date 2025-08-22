@@ -71,10 +71,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ---------------- FLASK ROUTES ----------------
 @app.route(f"/{TOKEN}", methods=["POST"])
-async def webhook():
-    data = await request.get_json(force=True)
+def webhook():
+    data = request.get_json(force=True)
     update = Update.de_json(data, application.bot)
-    await application.process_update(update)
+    # PTB ke loop me bhejna hoga
+    asyncio.run_coroutine_threadsafe(application.process_update(update), application.loop)
     return "ok"
 
 @app.route("/")
