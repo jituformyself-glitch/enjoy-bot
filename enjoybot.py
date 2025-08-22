@@ -7,6 +7,8 @@ from datetime import datetime, timedelta
 import os
 import asyncio
 import nest_asyncio
+from hypercorn.asyncio import serve
+from hypercorn.config import Config
 
 # ---------------- CONFIG ----------------
 TOKEN = os.getenv("BOT_TOKEN", "8082388693:AAH4j1DMEUbEiBCp6IPspxwVYI9HNQFEadw")
@@ -25,7 +27,7 @@ logging.basicConfig(
 app = Flask(__name__)
 
 # ---------------- GLOBAL APP ----------------
-application = Application.builder().token(TOKEN).build()  # Initialize here
+application = None   # ab init main() ke andar hoga
 
 # ---------------- HELPER FUNCTIONS ----------------
 def load_data():
@@ -81,10 +83,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ---------------- FLASK ROUTES ----------------
 @app.route(f"/{TOKEN}", methods=["POST"])
-def webhook():
+async def webhook():
+    global application
+    if application is None:
+        return "Application not ready", 500
+
     data = request.get_json(force=True)
     update = Update.de_json(data, application.bot)
-    asyncio.run_coroutine_threadsafe(application.process_update(update), application.loop)
+
+    # PTB ke queue me update bhejna
+    await application.update_queue.put(update)
+
     return "ok"
 
 @app.route("/")
@@ -93,12 +102,12 @@ def index():
 
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
-    from hypercorn.asyncio import serve
-    from hypercorn.config import Config
-
     nest_asyncio.apply()
 
     async def main():
+        global application
+        application = Application.builder().token(TOKEN).build()
+
         # Handlers
         application.add_handler(CommandHandler("start", start))
         application.add_handler(MessageHandler(filters.ALL, handle_message))
@@ -112,6 +121,10 @@ if __name__ == "__main__":
         config = Config()
         config.bind = [f"0.0.0.0:{PORT}"]
 
-        await serve(app, config)
+        # Dono parallel chalenge
+        await asyncio.gather(
+            application.start(),
+            serve(app, config),
+        )
 
     asyncio.run(main())
