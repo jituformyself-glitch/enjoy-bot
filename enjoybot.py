@@ -7,8 +7,6 @@ from datetime import datetime, timedelta
 import os
 import asyncio
 import nest_asyncio
-from hypercorn.asyncio import serve
-from hypercorn.config import Config
 
 # ---------------- CONFIG ----------------
 TOKEN = os.getenv("BOT_TOKEN")  # sirf ENV se lenge
@@ -28,7 +26,7 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 # ---------------- GLOBAL APP ----------------
-application = None   # init main() ke andar hoga
+application = Application.builder().token(TOKEN).build()
 loop = asyncio.get_event_loop()
 
 # ---------------- HELPER FUNCTIONS ----------------
@@ -85,17 +83,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ---------------- FLASK ROUTES ----------------
 @app.route(f"/{TOKEN}", methods=["POST"])
-def webhook():
-    global application
-    if application is None:
-        return "Application not ready", 500
-
+async def webhook():
     data = request.get_json(force=True)
     update = Update.de_json(data, application.bot)
-
-    # Correct way → Flask se PTB queue me safe push
-    loop.create_task(application.update_queue.put(update))
-
+    await application.process_update(update)
     return "ok", 200
 
 @app.route("/")
@@ -107,9 +98,6 @@ if __name__ == "__main__":
     nest_asyncio.apply()
 
     async def main():
-        global application
-        application = Application.builder().token(TOKEN).build()
-
         # Handlers
         application.add_handler(CommandHandler("start", start))
         application.add_handler(MessageHandler(filters.ALL, handle_message))
@@ -119,14 +107,7 @@ if __name__ == "__main__":
         await application.bot.set_webhook(webhook_url, drop_pending_updates=True)
         logger.info(f"✅ Webhook set to: {webhook_url}")
 
-        # Hypercorn config
-        config = Config()
-        config.bind = [f"0.0.0.0:{PORT}"]
-
-        # Dono parallel chalenge
-        await asyncio.gather(
-            application.start(),
-            serve(app, config),
-        )
+        # Flask ko run karao
+        app.run(host="0.0.0.0", port=PORT)
 
     loop.run_until_complete(main())
