@@ -25,7 +25,7 @@ logging.basicConfig(
 app = Flask(__name__)
 
 # ---------------- GLOBAL APP ----------------
-application: Application = None  # PTB Application global banaya
+application = Application.builder().token(TOKEN).build()  # Initialize here
 
 # ---------------- HELPER FUNCTIONS ----------------
 def load_data():
@@ -82,14 +82,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ---------------- FLASK ROUTES ----------------
 @app.route(f"/{TOKEN}", methods=["POST"])
 def webhook():
-    global application
-    if application is None:
-        return "Application not ready", 500
-
     data = request.get_json(force=True)
     update = Update.de_json(data, application.bot)
-
-    # PTB ke loop me bhejna
     asyncio.run_coroutine_threadsafe(application.process_update(update), application.loop)
     return "ok"
 
@@ -105,9 +99,6 @@ if __name__ == "__main__":
     nest_asyncio.apply()
 
     async def main():
-        global application
-        application = Application.builder().token(TOKEN).build()
-
         # Handlers
         application.add_handler(CommandHandler("start", start))
         application.add_handler(MessageHandler(filters.ALL, handle_message))
@@ -115,7 +106,7 @@ if __name__ == "__main__":
         # Webhook set
         webhook_url = f"{URL}/{TOKEN}"
         await application.bot.set_webhook(webhook_url)
-        print(f"Webhook set to: {webhook_url}")
+        print(f"✅ Webhook set to: {webhook_url}")
 
         # Hypercorn config
         config = Config()
