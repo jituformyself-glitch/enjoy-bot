@@ -1,4 +1,4 @@
-from flask import Flask, request 
+from flask import Flask, request  
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 import logging
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 # ---------------- GLOBAL APP ----------------
-application = None   # ab init main() ke andar hoga
+application = None   # init main() ke andar hoga
 
 # ---------------- HELPER FUNCTIONS ----------------
 def load_data():
@@ -84,7 +84,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ---------------- FLASK ROUTES ----------------
 @app.route(f"/{TOKEN}", methods=["POST"])
-async def webhook():
+def webhook():
     global application
     if application is None:
         return "Application not ready", 500
@@ -92,8 +92,8 @@ async def webhook():
     data = request.get_json(force=True)
     update = Update.de_json(data, application.bot)
 
-    # PTB ke queue me update bhejna
-    await application.update_queue.put(update)
+    # PTB queue me safe async push
+    asyncio.create_task(application.update_queue.put(update))
 
     return "ok"
 
