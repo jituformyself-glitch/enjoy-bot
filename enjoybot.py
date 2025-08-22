@@ -1,4 +1,4 @@
-from flask import Flask, request
+from flask import Flask, request 
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 import logging
@@ -11,17 +11,18 @@ from hypercorn.asyncio import serve
 from hypercorn.config import Config
 
 # ---------------- CONFIG ----------------
-TOKEN = os.getenv("BOT_TOKEN", "8082388693:AAH4j1DMEUbEiBCp6IPspxwVYI9HNQFEadw")
+TOKEN = os.getenv("BOT_TOKEN")  # sirf ENV se lenge
 GROUP_LINK = "https://t.me/campvoyzmoney"
 DATA_FILE = "user_data.json"
 PORT = int(os.environ.get("PORT", 5000))
-URL = os.getenv("RENDER_EXTERNAL_URL", "https://enjoy-bot.onrender.com")
+URL = os.getenv("RENDER_EXTERNAL_URL")  # sirf ENV se lenge
 
 # ---------------- LOGGING ----------------
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
 )
+logger = logging.getLogger(__name__)
 
 # ---------------- FLASK APP ----------------
 app = Flask(__name__)
@@ -98,7 +99,7 @@ async def webhook():
 
 @app.route("/")
 def index():
-    return "Bot is running!"
+    return "✅ Bot is running on Render!"
 
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
@@ -114,8 +115,8 @@ if __name__ == "__main__":
 
         # Webhook set
         webhook_url = f"{URL}/{TOKEN}"
-        await application.bot.set_webhook(webhook_url)
-        print(f"✅ Webhook set to: {webhook_url}")
+        await application.bot.set_webhook(webhook_url, drop_pending_updates=True)
+        logger.info(f"✅ Webhook set to: {webhook_url}")
 
         # Hypercorn config
         config = Config()
