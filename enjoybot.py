@@ -90,15 +90,17 @@ if __name__ == "__main__":
 
     async def main():
         global application
-        # PTB Application create inside async function
+        # PTB Application
         application = Application.builder().token(TOKEN).build()
 
-        # Add handlers
+        # Handlers
         application.add_handler(CommandHandler("start", start))
         application.add_handler(MessageHandler(filters.ALL, handle_message))
 
-        # Set webhook
-        await application.bot.set_webhook(f"{URL}/{TOKEN}")
+        # Webhook set
+        webhook_url = f"{URL}/{TOKEN}"
+        await application.bot.set_webhook(webhook_url)
+        print(f"Webhook set to: {webhook_url}")
 
         # Hypercorn config
         config = Config()
