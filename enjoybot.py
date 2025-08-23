@@ -1,4 +1,4 @@
-import os
+import os 
 import json
 import logging
 from datetime import datetime, timedelta
@@ -9,12 +9,12 @@ from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 
 # ---------------- CONFIG ----------------
-TOKEN = os.getenv("BOT_TOKEN")  # Render me environment variable set karo: BOT_TOKEN
+TOKEN = os.getenv("BOT_TOKEN")  
 GROUP_LINK = "https://t.me/campvoyzmoney"
 DATA_FILE = "user_data.json"
 PORT = int(os.environ.get("PORT", 5000))
-URL = os.getenv("RENDER_EXTERNAL_URL")  # Render auto set karega
-ADMIN_ID = int(os.getenv("ADMIN_ID", "123456789"))  # Apna Telegram ID yaha env me set karna
+URL = os.getenv("RENDER_EXTERNAL_URL")  
+ADMIN_ID = int(os.getenv("ADMIN_ID", "123456789"))  
 
 # ---------------- LOGGING ----------------
 logging.basicConfig(
@@ -60,7 +60,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
     await update.message.reply_text(
         f"Hello {user.first_name}! 👋\n\n"
-        f"Agar aapko money offering group join karna hai toh pehle apna full name bheje."
+        "Agar aapko 'MONEY OFFERING GROUP' join karna hai toh pehle apna **FULL NAME** bheje.\n\n"
+        "Don't worry, ye 1000% secure hai ✅"
     )
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -69,24 +70,32 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = load_data()
     clean_old_data()
 
+    # Step 1: Agar user naya hai aur name abhi tak save nahi
     if user_id not in data and not update.message.contact:
-        # Save name
         data[user_id] = {"name": text, "timestamp": datetime.now().isoformat()}
         save_data(data)
-
-        # Ask for phone number
+        await update.message.reply_text(
+            f"Great {text}! 🎉\n\nAb apna **Phone Number** bheje."
+        )
         keyboard = [[KeyboardButton("📱 Share Phone Number", request_contact=True)]]
         reply_markup = ReplyKeyboardMarkup(
             keyboard, one_time_keyboard=True, resize_keyboard=True
         )
-        await update.message.reply_text("Ab apna phone number share kare.", reply_markup=reply_markup)
+        await update.message.reply_text("👇 Phone number bhejne ke liye button dabaye:", reply_markup=reply_markup)
 
+    # Step 2: Agar phone abhi tak save nahi hua aur user contact bhejta hai
     elif "phone" not in data[user_id] and update.message.contact:
-        # Save phone
         data[user_id]["phone"] = update.message.contact.phone_number
         save_data(data)
-        await update.message.reply_text(f"✅ Shukriya! Ye rahi group ki link:\n{GROUP_LINK}")
+        await update.message.reply_text(f"✅ Shukriya {data[user_id]['name']}! Ye rahi group ki link:\n{GROUP_LINK}")
 
+    # Step 3: Agar phone abhi tak save nahi hua aur user manually number likhta hai
+    elif "phone" not in data[user_id] and text.isdigit() and 10 <= len(text) <= 15:
+        data[user_id]["phone"] = text
+        save_data(data)
+        await update.message.reply_text(f"✅ Shukriya {data[user_id]['name']}! Ye rahi group ki link:\n{GROUP_LINK}")
+
+    # Step 4: Agar already registered hai
     else:
         await update.message.reply_text("Aap already register ho chuke ho. Group link: " + GROUP_LINK)
 
