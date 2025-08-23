@@ -23,7 +23,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ---------------- FLASK ----------------
-app = Flask(__name__)   # 👈 sabse pehle define karna
+app = Flask(__name__)
 
 # ---------------- BOT APP ----------------
 nest_asyncio.apply()
@@ -82,7 +82,7 @@ async def webhook():
     """Telegram webhook endpoint"""
     data = request.get_json(force=True)
     update = Update.de_json(data, application.bot)
-    await application.process_update(update)   # ✅ ab await kar raha hai
+    await application.process_update(update)
     return "ok", 200
 
 @app.get("/")
@@ -93,6 +93,10 @@ def index():
 async def setup_bot():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.ALL, handle_message))
+
+    # 👇 ye do lines add karna zaroori hai
+    await application.initialize()
+    await application.start()
 
     webhook_url = f"{URL}/{TOKEN}"
     await application.bot.set_webhook(webhook_url, drop_pending_updates=True)
