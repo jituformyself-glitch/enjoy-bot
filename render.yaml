@@ -1,4 +1,4 @@
-services:
+services: 
   - type: web
     name: enjoy-bot
     env: python
@@ -9,6 +9,6 @@ services:
       - key: PORT
         value: "10000"
       - key: BOT_TOKEN
-        sync: false          # apna Telegram Bot Token Render ke dashboard me daalo
+        sync: false   # apna Telegram Bot Token Render ke dashboard me dalna
       - key: RENDER_EXTERNAL_URL
-        value: "https://enjoy-bot.onrender.com"   # yeh tumhare project ka exact URL hona chahiye
+        value: "https://enjoy-bot.onrender.com"   # apne project ka actual Render URL daalna
