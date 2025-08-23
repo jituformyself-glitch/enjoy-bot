@@ -5,16 +5,15 @@ from datetime import datetime, timedelta
 import nest_asyncio
 import asyncio
 from flask import Flask, request
-
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 
 # ---------------- CONFIG ----------------
-TOKEN = os.getenv("BOT_TOKEN")  # ENV se token lena
+TOKEN = os.getenv("BOT_TOKEN")  # Render me environment variable set karo: BOT_TOKEN
 GROUP_LINK = "https://t.me/campvoyzmoney"
 DATA_FILE = "user_data.json"
 PORT = int(os.environ.get("PORT", 5000))
-URL = os.getenv("RENDER_EXTERNAL_URL")  # Render ka URL, jaise https://enjoy-bot.onrender.com
+URL = os.getenv("RENDER_EXTERNAL_URL")  # Render auto set karega
 
 # ---------------- LOGGING ----------------
 logging.basicConfig(
@@ -24,14 +23,14 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ---------------- FLASK ----------------
-app = Flask(__name__)
+app = Flask(__name__)   # 👈 sabse pehle define karna
 
 # ---------------- BOT APP ----------------
 nest_asyncio.apply()
 loop = asyncio.get_event_loop()
 application = Application.builder().token(TOKEN).build()
 
-# ---------------- HELPERS ----------------
+# ---------------- DATA FUNCTIONS ----------------
 def load_data():
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, "r") as f:
@@ -40,17 +39,13 @@ def load_data():
 
 def save_data(data):
     with open(DATA_FILE, "w") as f:
-        json.dump(data, f)
+        json.dump(data, f, indent=4)
 
 def clean_old_data():
     data = load_data()
     now = datetime.now()
-    data = {
-        k: v
-        for k, v in data.items()
-        if datetime.fromisoformat(v["timestamp"]) + timedelta(days=30) > now
-    }
-    save_data(data)
+    updated = {uid: info for uid, info in data.items() if datetime.fromisoformat(info["timestamp"]) > now - timedelta(days=30)}
+    save_data(updated)
 
 # ---------------- HANDLERS ----------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -70,9 +65,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data[user_id] = {"name": text, "timestamp": datetime.now().isoformat()}
         save_data(data)
         keyboard = [[KeyboardButton("📱 Share Phone Number", request_contact=True)]]
-        reply_markup = ReplyKeyboardMarkup(
-            keyboard, one_time_keyboard=True, resize_keyboard=True
-        )
+        reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
         await update.message.reply_text("Ab apna phone number share kare.", reply_markup=reply_markup)
 
     elif "phone" not in data[user_id] and update.message.contact:
@@ -87,10 +80,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @app.post(f"/{TOKEN}")
 def webhook():
     data = request.get_json(force=True)
-    if not data:
-        return "no data", 400
     update = Update.de_json(data, application.bot)
-    loop.create_task(application.process_update(update))  # async ko sync wrapper me chalaya
+    loop.create_task(application.process_update(update))
     return "ok", 200
 
 @app.get("/")
@@ -99,15 +90,12 @@ def index():
 
 # ---------------- SETUP BOT ----------------
 async def setup_bot():
-    # Handlers add karo
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.ALL, handle_message))
 
-    # Webhook set karo
     webhook_url = f"{URL}/{TOKEN}"
     await application.bot.set_webhook(webhook_url, drop_pending_updates=True)
     logger.info(f"✅ Webhook set to: {webhook_url}")
 
-# Flask app load hone ke time hi setup run karwa do
 with app.app_context():
     loop.run_until_complete(setup_bot())
