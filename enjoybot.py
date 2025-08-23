@@ -14,7 +14,7 @@ TOKEN = os.getenv("BOT_TOKEN")  # ENV se token lena
 GROUP_LINK = "https://t.me/campvoyzmoney"
 DATA_FILE = "user_data.json"
 PORT = int(os.environ.get("PORT", 5000))
-URL = os.getenv("RENDER_EXTERNAL_URL")  # Render ka URL
+URL = os.getenv("RENDER_EXTERNAL_URL")  # Render ka URL, jaise https://enjoy-bot.onrender.com
 
 # ---------------- LOGGING ----------------
 logging.basicConfig(
@@ -87,6 +87,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @app.post(f"/{TOKEN}")
 def webhook():
     data = request.get_json(force=True)
+    if not data:
+        return "no data", 400
     update = Update.de_json(data, application.bot)
     loop.create_task(application.process_update(update))  # async ko sync wrapper me chalaya
     return "ok", 200
