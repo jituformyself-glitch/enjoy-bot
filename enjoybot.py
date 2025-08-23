@@ -108,6 +108,6 @@ if __name__ == "__main__":
         logger.info(f"✅ Webhook set to: {webhook_url}")
 
         # Flask ko sync run karao
-        app.run(host="0.0.0.0", port=PORT)
 
     loop.run_until_complete(main())
+
