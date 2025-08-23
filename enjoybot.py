@@ -85,10 +85,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ---------------- FLASK ROUTES ----------------
 @app.post(f"/{TOKEN}")
-async def webhook():
+def webhook():
     data = request.get_json(force=True)
     update = Update.de_json(data, application.bot)
-    await application.process_update(update)
+    loop.create_task(application.process_update(update))  # async ko sync wrapper me chalaya
     return "ok", 200
 
 @app.get("/")
@@ -107,7 +107,7 @@ if __name__ == "__main__":
         await application.bot.set_webhook(webhook_url, drop_pending_updates=True)
         logger.info(f"✅ Webhook set to: {webhook_url}")
 
-        # Flask ko sync run karao
+        # Flask ko run karo
+        app.run(host="0.0.0.0", port=PORT)
 
     loop.run_until_complete(main())
-
