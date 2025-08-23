@@ -1,19 +1,20 @@
+import os
+import json
+import logging
+from datetime import datetime, timedelta
+import nest_asyncio
+import asyncio
 from flask import Flask, request
+
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
-import logging
-import json
-from datetime import datetime, timedelta
-import os
-import asyncio
-import nest_asyncio
 
 # ---------------- CONFIG ----------------
-TOKEN = os.getenv("BOT_TOKEN")  # sirf ENV se lenge
+TOKEN = os.getenv("BOT_TOKEN")  # ENV se token lena
 GROUP_LINK = "https://t.me/campvoyzmoney"
 DATA_FILE = "user_data.json"
 PORT = int(os.environ.get("PORT", 5000))
-URL = os.getenv("RENDER_EXTERNAL_URL")  # sirf ENV se lenge
+URL = os.getenv("RENDER_EXTERNAL_URL")  # Render ka URL
 
 # ---------------- LOGGING ----------------
 logging.basicConfig(
@@ -22,14 +23,15 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ---------------- FLASK APP ----------------
+# ---------------- FLASK ----------------
 app = Flask(__name__)
 
-# ---------------- GLOBAL APP ----------------
-application = Application.builder().token(TOKEN).build()
+# ---------------- BOT APP ----------------
+nest_asyncio.apply()
 loop = asyncio.get_event_loop()
+application = Application.builder().token(TOKEN).build()
 
-# ---------------- HELPER FUNCTIONS ----------------
+# ---------------- HELPERS ----------------
 def load_data():
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, "r") as f:
@@ -50,7 +52,7 @@ def clean_old_data():
     }
     save_data(data)
 
-# ---------------- BOT HANDLERS ----------------
+# ---------------- HANDLERS ----------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
     await update.message.reply_text(
@@ -82,32 +84,30 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Aap already register ho chuke ho. Group link: " + GROUP_LINK)
 
 # ---------------- FLASK ROUTES ----------------
-@app.route(f"/{TOKEN}", methods=["POST"])
+@app.post(f"/{TOKEN}")
 async def webhook():
     data = request.get_json(force=True)
     update = Update.de_json(data, application.bot)
     await application.process_update(update)
     return "ok", 200
 
-@app.route("/")
+@app.get("/")
 def index():
     return "✅ Bot is running on Render!"
 
 # ---------------- MAIN ----------------
 if __name__ == "__main__":
-    nest_asyncio.apply()
-
     async def main():
-        # Handlers
+        # Handlers add karo
         application.add_handler(CommandHandler("start", start))
         application.add_handler(MessageHandler(filters.ALL, handle_message))
 
-        # Webhook set
+        # Webhook set karo
         webhook_url = f"{URL}/{TOKEN}"
         await application.bot.set_webhook(webhook_url, drop_pending_updates=True)
         logger.info(f"✅ Webhook set to: {webhook_url}")
 
-        # Flask ko run karao
+        # Flask ko sync run karao
         app.run(host="0.0.0.0", port=PORT)
 
     loop.run_until_complete(main())
