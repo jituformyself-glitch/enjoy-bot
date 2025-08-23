@@ -78,10 +78,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ---------------- FLASK ROUTES ----------------
 @app.post(f"/{TOKEN}")
-def webhook():
+async def webhook():
+    """Telegram webhook endpoint"""
     data = request.get_json(force=True)
     update = Update.de_json(data, application.bot)
-    loop.create_task(application.process_update(update))
+    await application.process_update(update)   # ✅ ab await kar raha hai
     return "ok", 200
 
 @app.get("/")
