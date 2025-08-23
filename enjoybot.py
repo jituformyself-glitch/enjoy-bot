@@ -95,19 +95,17 @@ def webhook():
 def index():
     return "✅ Bot is running on Render!"
 
-# ---------------- MAIN ----------------
-if __name__ == "__main__":
-    async def main():
-        # Handlers add karo
-        application.add_handler(CommandHandler("start", start))
-        application.add_handler(MessageHandler(filters.ALL, handle_message))
+# ---------------- SETUP BOT ----------------
+async def setup_bot():
+    # Handlers add karo
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(MessageHandler(filters.ALL, handle_message))
 
-        # Webhook set karo
-        webhook_url = f"{URL}/{TOKEN}"
-        await application.bot.set_webhook(webhook_url, drop_pending_updates=True)
-        logger.info(f"✅ Webhook set to: {webhook_url}")
+    # Webhook set karo
+    webhook_url = f"{URL}/{TOKEN}"
+    await application.bot.set_webhook(webhook_url, drop_pending_updates=True)
+    logger.info(f"✅ Webhook set to: {webhook_url}")
 
-        # Flask ko run karo
-        app.run(host="0.0.0.0", port=PORT)
-
-    loop.run_until_complete(main())
+# Flask app load hone ke time hi setup run karwa do
+with app.app_context():
+    loop.run_until_complete(setup_bot())
