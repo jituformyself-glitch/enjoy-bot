@@ -1,163 +1,151 @@
-import os
+import os 
 import json
-import base64
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-from telegram import Update
-from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler,
-    ContextTypes, filters
+import logging
+from datetime import datetime, timedelta
+import nest_asyncio
+import asyncio
+from flask import Flask, request
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
+from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
+
+# ---------------- CONFIG ----------------
+TOKEN = os.getenv("BOT_TOKEN")  
+GROUP_LINK = "https://t.me/campvoyzmoney"
+DATA_FILE = "user_data.json"
+PORT = int(os.environ.get("PORT", 5000))
+URL = os.getenv("RENDER_EXTERNAL_URL")  
+ADMIN_ID = int(os.getenv("ADMIN_ID", "123456789"))  
+
+# ---------------- LOGGING ----------------
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO,
 )
-from quart import Quart, request
-from datetime import datetime
+logger = logging.getLogger(__name__)
 
-# ==============================
-# ENV Variables
-# ==============================
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = os.getenv("ADMIN_ID")
-GROUP_LINK = os.getenv("GROUP_LINK")
-SHEET_ID = os.getenv("SHEET_ID")
-CREDS_JSON = os.getenv("GOOGLE_CREDENTIALS")
-PUBLIC_URL = os.getenv("PUBLIC_URL")  # e.g. https://enjoy-bot.onrender.com
-WEBHOOK_PATH = f"/webhook/{BOT_TOKEN}"  # unique path per bot
+# ---------------- FLASK ----------------
+app = Flask(__name__)
 
-# ==============================
-# Google Sheets Setup
-# ==============================
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+# ---------------- BOT APP ----------------
+nest_asyncio.apply()
+loop = asyncio.get_event_loop()
+application = Application.builder().token(TOKEN).build()
 
-try:
-    creds_dict = json.loads(base64.b64decode(CREDS_JSON).decode("utf-8"))
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-    client = gspread.authorize(creds)
-    sheet = client.open_by_key(SHEET_ID).sheet1
-    print("✅ Google Sheets connected successfully!")
-except Exception as e:
-    raise ValueError(f"❌ Google Sheets setup failed: {e}")
+# ---------------- DATA FUNCTIONS ----------------
+def load_data():
+    if os.path.exists(DATA_FILE):
+        with open(DATA_FILE, "r") as f:
+            return json.load(f)
+    return {}
 
-# ==============================
-# Telegram Bot Setup
-# ==============================
-telegram_app = ApplicationBuilder().token(BOT_TOKEN).build()
-bot = telegram_app.bot  # convenience
+def save_data(data):
+    with open(DATA_FILE, "w") as f:
+        json.dump(data, f, indent=4)
 
-# ==============================
-# Handlers
-# ==============================
+def clean_old_data():
+    """30 din se purane users ko delete karo"""
+    data = load_data()
+    now = datetime.now()
+    updated = {
+        uid: info
+        for uid, info in data.items()
+        if datetime.fromisoformat(info["timestamp"]) > now - timedelta(days=30)
+    }
+    if len(updated) != len(data):
+        save_data(updated)
+    return updated
+
+# ---------------- HANDLERS ----------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
+    user = update.message.from_user
     await update.message.reply_text(
-        f"👋 Hello {user.first_name}!\n\n"
-        "Agar aapko *MONEY OFFERING GROUP* join karna hai toh phale apna "
-        "**FULL NAME** aur **PHONE NUMBER** register karna hoga.\n\n"
-        "Don't worry, ye 1000% secure hai ✅\n\n"
-        "👉 Phela apna **full name** bhejo."
+        f"Hello {user.first_name}! 👋\n\n"
+        "Agar aapko 'MONEY OFFERING GROUP' join karna hai toh pehle apna **FULL NAME** bheje.\n\n"
+        "Don't worry, ye 1000% secure hai ✅"
     )
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message:
+    user_id = str(update.message.from_user.id)
+    text = update.message.text
+    data = load_data()
+    clean_old_data()
+
+    # Step 1: Agar user naya hai aur name abhi tak save nahi
+    if user_id not in data and not update.message.contact:
+        data[user_id] = {"name": text, "timestamp": datetime.now().isoformat()}
+        save_data(data)
+        await update.message.reply_text(
+            f"Great {text}! 🎉\n\nAb apna **Phone Number** bheje."
+        )
+        keyboard = [[KeyboardButton("📱 Share Phone Number", request_contact=True)]]
+        reply_markup = ReplyKeyboardMarkup(
+            keyboard, one_time_keyboard=True, resize_keyboard=True
+        )
+        await update.message.reply_text("👇 Phone number bhejne ke liye button dabaye:", reply_markup=reply_markup)
+
+    # Step 2: Agar phone abhi tak save nahi hua aur user contact bhejta hai
+    elif "phone" not in data[user_id] and update.message.contact:
+        data[user_id]["phone"] = update.message.contact.phone_number
+        save_data(data)
+        await update.message.reply_text(f"✅ Shukriya {data[user_id]['name']}! Ye rahi group ki link:\n{GROUP_LINK}")
+
+    # Step 3: Agar phone abhi tak save nahi hua aur user manually number likhta hai
+    elif "phone" not in data[user_id] and text.isdigit() and 10 <= len(text) <= 15:
+        data[user_id]["phone"] = text
+        save_data(data)
+        await update.message.reply_text(f"✅ Shukriya {data[user_id]['name']}! Ye rahi group ki link:\n{GROUP_LINK}")
+
+    # Step 4: Agar already registered hai
+    else:
+        await update.message.reply_text("Aap already register ho chuke ho. Group link: " + GROUP_LINK)
+
+# ---------------- ADMIN COMMAND ----------------
+async def list_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+
+    if user.id != ADMIN_ID:
+        await update.message.reply_text("⛔ Permission denied. Ye command sirf admin ke liye hai.")
         return
 
-    user_id = str(update.effective_user.id)
-    text = update.message.text or ""
-
-    # Existing records
-    records = sheet.get_all_records()
-    user_record = next((r for r in records if str(r.get("UserID")) == user_id), None)
-
-    # New user -> store name, empty phone
-    if not user_record:
-        sheet.append_row([user_id, text, "", datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
-        await update.message.reply_text("✅ Great! Ab apna **phone number** bhejo.")
+    data = clean_old_data()
+    if not data:
+        await update.message.reply_text("⚠️ Abhi tak koi active user register nahi hai.")
         return
 
-    # Phone number missing -> accept contact or digits
-    if user_record and (user_record.get("Phone") == "" or user_record.get("Phone") is None):
-        if update.message.contact:
-            phone = update.message.contact.phone_number
-        elif text.isdigit() and 10 <= len(text) <= 15:
-            phone = text
-        else:
-            await update.message.reply_text("📱 Kripya sahi phone number bhejo.")
-            return
-
-        row_index = records.index(user_record) + 2  # +1 header, +1 1-indexed
-        sheet.update_cell(row_index, 3, phone)
-        await update.message.reply_text(f"✅ Shukriya! Ye rahi group ki link:\n{GROUP_LINK}")
-        return
-
-    # Already registered
-    await update.message.reply_text("Aap already register ho chuke ho ✅\n\nGroup link: " + GROUP_LINK)
-
-async def users(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if str(update.effective_user.id) != str(ADMIN_ID):
-        await update.message.reply_text("❌ Aap is command ke liye authorized nahi ho.")
-        return
-
-    records = sheet.get_all_records()
-    if not records:
-        await update.message.reply_text("⚠️ Abhi koi user register nahi hai.")
-        return
-
-    msg = "📋 Registered Users:\n\n"
-    for r in records:
-        msg += f"👤 {r.get('Name','-')} | 📱 {r.get('Phone','-')} | 📅 {r.get('Date','-')}\n"
+    msg = "📋 Registered Users (last 30 days):\n\n"
+    for uid, info in data.items():
+        name = info.get("name", "❌ No Name")
+        phone = info.get("phone", "❌ No Phone")
+        time = info.get("timestamp", "")
+        msg += f"👤 {name}\n📱 {phone}\n🕒 {time}\n\n"
 
     await update.message.reply_text(msg)
 
-# Register handlers
-telegram_app.add_handler(CommandHandler("start", start))
-telegram_app.add_handler(CommandHandler("users", users))
-telegram_app.add_handler(MessageHandler(filters.TEXT | filters.CONTACT, handle_message))
-
-# ==============================
-# Quart App (ASGI) for Webhook
-# ==============================
-app = Quart(__name__)
-
-@app.before_serving
-async def on_startup():
-    # Start PTB without polling; just initialize runtime
-    await telegram_app.initialize()
-    await telegram_app.start()
-
-    # Auto-set webhook if PUBLIC_URL provided
-    if PUBLIC_URL:
-        url = PUBLIC_URL.rstrip("/") + WEBHOOK_PATH
-        await bot.set_webhook(url=url)
-        print(f"✅ Webhook set to: {url}")
-
-@app.after_serving
-async def on_shutdown():
-    # Keep webhook or delete (optional). Here we keep it.
-    # await bot.delete_webhook(drop_pending_updates=False)
-    await telegram_app.stop()
-    await telegram_app.shutdown()
-
-@app.route(WEBHOOK_PATH, methods=["POST"])
+# ---------------- FLASK ROUTES ----------------
+@app.post(f"/{TOKEN}")
 async def webhook():
-    data = await request.get_json()
-    if not data:
-        return "bad request", 400
-    update = Update.de_json(data, bot)
-    # Directly process update (no internal fetcher/queue) -> avoids pending task errors
-    await telegram_app.process_update(update)
+    """Telegram webhook endpoint"""
+    data = request.get_json(force=True)
+    update = Update.de_json(data, application.bot)
+    await application.process_update(update)
     return "ok", 200
 
-# Health check
-@app.get("/healthz")
-async def healthz():
-    return {"status": "ok"}
+@app.get("/")
+def index():
+    return "✅ Bot is running on Render!"
 
-# ==============================
-# Local dev entry (Render runs via start command)
-# ==============================
-if __name__ == "__main__":
-    import asyncio
-    import hypercorn.asyncio
-    from hypercorn.config import Config
+# ---------------- SETUP BOT ----------------
+async def setup_bot():
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("users", list_users))  # admin only
+    application.add_handler(MessageHandler(filters.ALL, handle_message))
 
-    config = Config()
-    config.bind = ["0.0.0.0:" + os.getenv("PORT", "8000")]
-    asyncio.run(hypercorn.asyncio.serve(app, config))
+    await application.initialize()
+    await application.start()
+
+    webhook_url = f"{URL}/{TOKEN}"
+    await application.bot.set_webhook(webhook_url, drop_pending_updates=True)
+    logger.info(f"✅ Webhook set to: {webhook_url}")
+
+with app.app_context():
+    loop.run_until_complete(setup_bot())
