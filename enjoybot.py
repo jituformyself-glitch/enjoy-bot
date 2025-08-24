@@ -101,9 +101,9 @@ async def users(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ==============================
 # Flask App for Webhook
 # ==============================
-flask_app = Flask(__name__)
+app = Flask(__name__)
 
-@flask_app.route(WEBHOOK_PATH, methods=["POST"])
+@app.route(WEBHOOK_PATH, methods=["POST"])
 async def webhook():
     update = Update.de_json(request.get_json(), bot)
     await telegram_app.update_queue.put(update)
@@ -126,4 +126,4 @@ if __name__ == "__main__":
 
     config = Config()
     config.bind = ["0.0.0.0:" + os.getenv("PORT", "8000")]
-    asyncio.run(hypercorn.asyncio.serve(flask_app, config))
+    asyncio.run(hypercorn.asyncio.serve(app, config))
