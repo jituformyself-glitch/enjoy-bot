@@ -18,7 +18,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = os.getenv("ADMIN_ID")   # apna Telegram ID
 GROUP_LINK = os.getenv("GROUP_LINK")
 SHEET_NAME = os.getenv("SHEET_NAME")
-CREDS_JSON = os.getenv("GOOGLE_SHEET_CREDS")
+CREDS_JSON = os.getenv("GOOGLE_CREDENTIALS")
 
 # ==============================
 # Google Sheets Setup
@@ -116,3 +116,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
