@@ -18,7 +18,7 @@ from datetime import datetime
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = os.getenv("ADMIN_ID")   # apna Telegram ID
 GROUP_LINK = os.getenv("GROUP_LINK")
-SHEET_NAME = os.getenv("SHEET_NAME")
+SHEET_ID = os.getenv("SHEET_ID")   # Spreadsheet ID
 CREDS_JSON = os.getenv("GOOGLE_CREDENTIALS")
 
 # ==============================
@@ -31,7 +31,9 @@ try:
     creds_dict = json.loads(base64.b64decode(CREDS_JSON).decode("utf-8"))
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
-    sheet = client.open(SHEET_NAME).sheet1
+    
+    # Spreadsheet ID se open karo
+    sheet = client.open_by_key(SHEET_ID).sheet1
     print("✅ Google Sheets connected successfully!")
 except Exception as e:
     raise ValueError(f"❌ Google Sheets setup failed: {e}")
